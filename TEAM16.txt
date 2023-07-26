@@ -1,0 +1,591 @@
+/*
+---------------------------------------------------------------------------------------------------------------------
+Business Challenge - Team 16
+Authors - Sreekar, Hayata, Astrid, Magada
+----------------------------------------------------------------------------------------------------------------------
+*/
+
+
+
+
+-- Using invest Database
+USE invest;
+
+
+
+/*
+1. What is the most recent 12M, 18M, 24M (months) return for each of the securities (and for the entire portfolio)? 
+*/
+
+/*
+CLIENTS - Adriana De Lucas,Bojana Popovic,Fernando Fernàndez,Florian Talke
+*/
+
+/* 
+Creating temporary dataset
+and temporaily storing the data 
+by joining all the tables 
+and filtering them with 
+account id 712,71201,22502,160,16001,71401,71402 (CLIENTS - Adriana De Lucas,Bojana Popovic,Fernando Fernàndez,Florian Talke)
+and for period of 2 years
+(Customer are selected by random generation of four numbers and choosing them with serial number.)
+
+*/
+WITH ft1 AS (
+SELECT cd.full_name, 
+       sm.major_asset_class, 
+       sm.minor_asset_class, 
+       pd.ticker, 
+       sm.security_name, 
+       hc.quantity, 
+       pd.`date`, 
+       pd.`value`
+FROM account_dim AS ad
+JOIN customer_details AS cd
+ON  ad.client_id = cd.customer_id
+JOIN holdings_current AS hc
+ON ad.account_id = hc.account_id
+JOIN security_masterlist AS sm
+ON sm.ticker = hc.ticker
+JOIN pricing_daily_new AS pd
+ON pd.ticker = sm.ticker
+WHERE hc.account_id IN ('712','71201','22501','22502','160','16001','71401','71402') 
+AND pd.date BETWEEN '2020-09-09' AND '2022-09-09'
+AND pd.price_type = 'Adjusted'
+),
+
+
+/*
+Creating the temporary dataset 
+where calculating the lagged price
+ for 12 months, 18 months, 24 months respectively
+*/
+ft2 AS(
+SELECT full_name, 
+       major_asset_class, 
+       minor_asset_class,
+       ticker, 
+       security_name, 
+       quantity, 
+       `date`, 
+       `value`,
+       LAG(value, 250) OVER(PARTITION BY ticker
+                            ORDER BY date) AS lagged_price_12m,
+       LAG(value, 378) OVER(PARTITION BY ticker
+                            ORDER BY date) AS lagged_price_18m,
+       LAG(value, 504) OVER(PARTITION BY ticker
+                            ORDER BY date) AS lagged_price_24m
+FROM ft1
+),
+
+/*
+Calculating returns for 12 months, 18 months,24 months
+*/
+ft3 AS(
+SELECT full_name, 
+       major_asset_class, 
+       minor_asset_class,
+       ticker, 
+       security_name, 
+       quantity, 
+       `date`, 
+       `value`,
+       lagged_price_12m,
+       lagged_price_18m,
+       lagged_price_24m,
+       (`value` - lagged_price_12m) / lagged_price_12m AS return_12m,
+       (`value` - lagged_price_18m) / lagged_price_18m AS return_18m,
+       (`value` - lagged_price_24m) / lagged_price_24m AS return_24m
+FROM ft2
+WHERE date = '2022-09-09'
+),
+
+/*
+Making the multiple records in major assest class into one entity
+and displaying the whole data
+*/
+ft4 AS(
+SELECT ft3.full_name,ft3.ticker,
+       CASE WHEN sm.major_asset_class = 'equty' THEN 'equity'
+            WHEN sm.major_asset_class = 'fixed income' THEN 'fixed_income'
+            WHEN sm.major_asset_class = 'fixed income corporate' THEN 'fixed_income'
+            ELSE sm.major_asset_class END AS major_asset_class,
+       sm.minor_asset_class,
+	   ft3.security_name, 
+	   AVG(ft3.return_12m) AS return_12m,
+	   AVG(ft3.return_18m) AS return_18m,
+       AVG(ft3.return_24m) AS return_24m
+FROM ft3
+JOIN security_masterlist AS sm
+ON ft3.security_name = sm.security_name
+WHERE return_12m IS NOT NULL
+  AND return_18m IS NOT NULL
+  AND return_24m IS NOT NULL
+GROUP BY ticker
+ORDER BY return_12m DESC , return_18m DESC, return_24m DESC
+)
+
+/*
+Displaying the 12,18,24 MONTHS returns of 
+Adriana De Lucas,Bojana Popovic,Fernando Fernàndez,Florian Talke
+
+*/
+
+SELECT full_name,
+ticker,
+       major_asset_class,
+       minor_asset_class,
+       security_name, 
+        return_12m, 
+        return_18m,
+       return_24m
+FROM ft4
+;
+
+/*
+----------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------
+*/
+
+/* 
+Creating temporary dataset
+and temporaily storing the data 
+by joining all the tables 
+and filtering them with 
+account id 712,71201,22502,160,16001,71401,71402 (CLIENTS - Adriana De Lucas,Bojana Popovic,Fernando Fernàndez,Florian Talke)
+and for period of 2 years
+(Customer are selected by random generation of four numbers and choosing them with serial number.)
+
+*/
+WITH ft1 AS (
+SELECT cd.full_name, 
+       sm.major_asset_class, 
+       sm.minor_asset_class, 
+       pd.ticker, 
+       sm.security_name, 
+       hc.quantity, 
+       pd.`date`, 
+       pd.`value`
+FROM account_dim AS ad
+JOIN customer_details AS cd
+ON  ad.client_id = cd.customer_id
+JOIN holdings_current AS hc
+ON ad.account_id = hc.account_id
+JOIN security_masterlist AS sm
+ON sm.ticker = hc.ticker
+JOIN pricing_daily_new AS pd
+ON pd.ticker = sm.ticker
+WHERE hc.account_id IN ('712','71201','22501','22502','160','16001','71401','71402') 
+AND pd.date BETWEEN '2020-09-09' AND '2022-09-09'
+AND pd.price_type = 'Adjusted'
+),
+
+
+/*
+Creating the temporary dataset 
+where calculating the lagged price
+ for 12 months, 18 months, 24 months respectively
+*/
+ft2 AS(
+SELECT full_name, 
+       major_asset_class, 
+       minor_asset_class,
+       ticker, 
+       security_name, 
+       quantity, 
+       `date`, 
+       `value`,
+       LAG(value, 250) OVER(PARTITION BY ticker
+                            ORDER BY date) AS lagged_price_12m,
+       LAG(value, 378) OVER(PARTITION BY ticker
+                            ORDER BY date) AS lagged_price_18m,
+       LAG(value, 504) OVER(PARTITION BY ticker
+                            ORDER BY date) AS lagged_price_24m
+FROM ft1
+),
+
+/*
+Calculating returns for 12 months, 18 months,24 months
+*/
+ft3 AS(
+SELECT full_name, 
+       major_asset_class, 
+       minor_asset_class,
+       ticker, 
+       security_name, 
+       quantity, 
+       `date`, 
+       `value`,
+       lagged_price_12m,
+       lagged_price_18m,
+       lagged_price_24m,
+       (`value` - lagged_price_12m) / lagged_price_12m AS return_12m,
+       (`value` - lagged_price_18m) / lagged_price_18m AS return_18m,
+       (`value` - lagged_price_24m) / lagged_price_24m AS return_24m
+FROM ft2
+WHERE date = '2022-09-09'
+),
+
+/*
+Making the multiple records in major assest class into one entity
+and displaying the whole data
+*/
+ft4 AS(
+SELECT ft3.full_name,ft3.ticker,
+       CASE WHEN sm.major_asset_class = 'equty' THEN 'equity'
+            WHEN sm.major_asset_class = 'fixed income' THEN 'fixed_income'
+            WHEN sm.major_asset_class = 'fixed income corporate' THEN 'fixed_income'
+            ELSE sm.major_asset_class END AS major_asset_class,
+       sm.minor_asset_class,
+	   ft3.security_name, 
+	   AVG(ft3.return_12m) AS return_12m,
+	   AVG(ft3.return_18m) AS return_18m,
+       AVG(ft3.return_24m) AS return_24m
+FROM ft3
+JOIN security_masterlist AS sm
+ON ft3.security_name = sm.security_name
+WHERE return_12m IS NOT NULL
+  AND return_18m IS NOT NULL
+  AND return_24m IS NOT NULL
+GROUP BY ticker
+ORDER BY return_12m DESC , return_18m DESC, return_24m DESC
+)
+
+/*
+Calculating the total returns for the all the clients
+*/
+SELECT full_name,
+        SUM(return_12m), 
+        SUM(return_18m),
+       SUM(return_24m)
+FROM ft4
+Group by full_name
+;
+
+
+/*
+===============================================================
+==============================================================
+*/
+
+/* 
+Creating temporary dataset
+and temporaily storing the data 
+by joining all the tables 
+and filtering them with 
+account id 712,71201,22502,160,16001,71401,71402 (CLIENTS - Adriana De Lucas,Bojana Popovic,Fernando Fernàndez,Florian Talke)
+and for period of 2 years
+(Customer are selected by random generation of four numbers and choosing them with serial number.)
+
+*/
+WITH ft1 AS (
+SELECT cd.full_name, 
+       sm.major_asset_class, 
+       sm.minor_asset_class, 
+       pd.ticker, 
+       sm.security_name, 
+       hc.quantity, 
+       pd.`date`, 
+       pd.`value`
+FROM account_dim AS ad
+JOIN customer_details AS cd
+ON  ad.client_id = cd.customer_id
+JOIN holdings_current AS hc
+ON ad.account_id = hc.account_id
+JOIN security_masterlist AS sm
+ON sm.ticker = hc.ticker
+JOIN pricing_daily_new AS pd
+ON pd.ticker = sm.ticker
+WHERE hc.account_id IN ('712','71201','22501','22502','160','16001','71401','71402') 
+AND pd.date BETWEEN '2020-09-09' AND '2022-09-09'
+AND pd.price_type = 'Adjusted'
+),
+
+
+/*
+Creating the temporary dataset 
+where calculating the lagged price
+ for 12 months, 18 months, 24 months respectively
+*/
+ft2 AS(
+SELECT full_name, 
+       major_asset_class, 
+       minor_asset_class,
+       ticker, 
+       security_name, 
+       quantity, 
+       `date`, 
+       `value`,
+       LAG(value, 250) OVER(PARTITION BY ticker
+                            ORDER BY date) AS lagged_price_12m,
+       LAG(value, 378) OVER(PARTITION BY ticker
+                            ORDER BY date) AS lagged_price_18m,
+       LAG(value, 504) OVER(PARTITION BY ticker
+                            ORDER BY date) AS lagged_price_24m
+FROM ft1
+),
+
+/*
+Calculating returns for 12 months, 18 months,24 months
+*/
+ft3 AS(
+SELECT full_name, 
+       major_asset_class, 
+       minor_asset_class,
+       ticker, 
+       security_name, 
+       quantity, 
+       `date`, 
+       `value`,
+       lagged_price_12m,
+       lagged_price_18m,
+       lagged_price_24m,
+       (`value` - lagged_price_12m) / lagged_price_12m AS return_12m,
+       (`value` - lagged_price_18m) / lagged_price_18m AS return_18m,
+       (`value` - lagged_price_24m) / lagged_price_24m AS return_24m
+FROM ft2
+WHERE date = '2022-09-09'
+),
+
+/*
+Making the multiple records in major assest class into one entity
+and displaying the whole data
+*/
+ft4 AS(
+SELECT ft3.full_name,ft3.ticker,
+       CASE WHEN sm.major_asset_class = 'equty' THEN 'equity'
+            WHEN sm.major_asset_class = 'fixed income' THEN 'fixed_income'
+            WHEN sm.major_asset_class = 'fixed income corporate' THEN 'fixed_income'
+            ELSE sm.major_asset_class END AS major_asset_class,
+       sm.minor_asset_class,
+	   ft3.security_name, 
+	   AVG(ft3.return_12m) AS return_12m,
+	   AVG(ft3.return_18m) AS return_18m,
+       AVG(ft3.return_24m) AS return_24m
+FROM ft3
+JOIN security_masterlist AS sm
+ON ft3.security_name = sm.security_name
+WHERE return_12m IS NOT NULL
+  AND return_18m IS NOT NULL
+  AND return_24m IS NOT NULL
+GROUP BY ticker
+ORDER BY return_12m DESC , return_18m DESC, return_24m DESC
+)
+/*
+Calculating the total returns for the all the clients for each security
+*/
+
+SELECT full_name,security_name,
+        SUM(return_12m), 
+        SUM(return_18m),
+       SUM(return_24m)
+FROM ft4
+GROUP BY full_name,security_name
+ORDER BY full_name;
+
+-- --------------------------------------------------------------------------------------
+-- |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+-- ------------------------------------------------------------------------------------
+
+
+
+-- ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+-- |||||||2. What are the correlations between your assets? Are there any interesting correlations?||||||||
+-- ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+
+-- correlation between equity and commodities 
+WITH 
+db1 AS (SELECT major_asset_class, minor_asset_class, id, security_name, sec_type, `date`, `value`, pr.ticker, price_type, 
+LAG (`value`,250) OVER (
+PARTITION BY pr.ticker 
+ORDER BY `date`) AS lagged_price
+FROM pricing_daily_new AS pr
+JOIN security_masterlist AS se
+ON se.ticker = pr.ticker
+WHERE pr.price_type = 'Adjusted' AND pr.`date` > '2019-09-09' ),
+
+db2 AS (SELECT 
+CASE WHEN major_asset_class = "equity" OR  major_asset_class = "equty" THEN (`value` - lagged_price) / lagged_price
+ELSE 0
+END AS r1, 
+CASE WHEN major_asset_class = "commodities" THEN (`value` - lagged_price) / lagged_price
+ELSE 0
+END AS r2 
+FROM db1)
+
+SELECT ROUND((count(*) * sum(ROUND(r1, 2) * r2) - sum(ROUND(r1,2)) * sum(r2)) / 
+        (sqrt(count(*) * sum(ROUND(r1, 2) * ROUND(r1,2)) - sum(ROUND(r1,2)) * sum(ROUND(r1,2))) 
+        * sqrt(count(*) * sum(r2 * r2) - sum(r2) * sum(r2))), 4)
+AS correlation_coefficient        
+FROM db2;
+
+
+
+
+-- correlation between alternatives and commodities
+WITH 
+db1 AS (SELECT major_asset_class, minor_asset_class, id, security_name, sec_type, date, value, pr.ticker, price_type, 
+LAG (value,360) OVER (
+PARTITION BY pr.ticker 
+ORDER BY date) AS lagged_price
+FROM pricing_daily_new AS pr
+INNER JOIN security_masterlist AS se
+ON se.ticker = pr.ticker
+WHERE price_type = 'Adjusted' ),
+
+db2 AS (SELECT 
+CASE WHEN major_asset_class = "alternatives"  THEN (value - lagged_price) / lagged_price
+ELSE 0
+END AS r1,
+CASE WHEN major_asset_class = "commodities" THEN (value - lagged_price) / lagged_price
+ELSE 0
+END AS r2 
+FROM db1)
+
+SELECT ROUND((count(*) * sum(ROUND(r1, 2) * r2) - sum(ROUND(r1,2)) * sum(r2)) / 
+        (sqrt(count(*) * sum(ROUND(r1, 2) * ROUND(r1,2)) - sum(ROUND(r1,2)) * sum(ROUND(r1,2))) * sqrt(count(*) * sum(r2 * r2) - sum(r2) * sum(r2))), 4)
+AS correlation_coefficient        
+FROM db2;
+
+
+-- correlation between alternatives and fixed income
+WITH 
+db1 AS (SELECT major_asset_class, minor_asset_class, id, security_name, sec_type, date, value, pr.ticker, price_type, 
+LAG (value,360) OVER (
+PARTITION BY pr.ticker 
+ORDER BY date) AS lagged_price
+FROM pricing_daily_new AS pr
+INNER JOIN security_masterlist AS se
+ON se.ticker = pr.ticker
+WHERE price_type = 'Adjusted' and `date` ),
+
+db2 AS (SELECT 
+CASE WHEN major_asset_class = "fixed income" OR  major_asset_class = "fixed income corporate" or major_asset_class = "fixed_income" THEN (value - lagged_price) / lagged_price
+ELSE 0
+END AS r1,
+CASE WHEN major_asset_class = "alternatives" THEN (value - lagged_price) / lagged_price
+ELSE 0
+END AS r2 
+FROM db1)
+
+SELECT ROUND((count(*) * sum(ROUND(r1, 2) * r2) - sum(ROUND(r1,2)) * sum(r2)) / 
+        (sqrt(count(*) * sum(ROUND(r1, 2) * ROUND(r1,2)) - sum(ROUND(r1,2)) * sum(ROUND(r1,2))) * sqrt(count(*) * sum(r2 * r2) - sum(r2) * sum(r2))), 4)
+AS correlation_coefficient        
+FROM db2;
+
+-- correlation between commodities and fixed income
+WITH 
+db1 AS (SELECT major_asset_class, minor_asset_class, id, security_name, sec_type, date, value, pr.ticker, price_type, 
+LAG (value,360) OVER (
+PARTITION BY pr.ticker 
+ORDER BY date) AS lagged_price
+FROM pricing_daily_new AS pr
+INNER JOIN security_masterlist AS se
+ON se.ticker = pr.ticker
+WHERE price_type = 'Adjusted'),
+
+db2 AS (SELECT 
+CASE WHEN major_asset_class = "fixed income" OR  major_asset_class = "fixed income corporate" or major_asset_class = "fixed_income" THEN (value - lagged_price) / lagged_price
+ELSE 0
+END AS r1,
+CASE WHEN major_asset_class = "commodities" THEN (value - lagged_price) / lagged_price
+ELSE 0
+END AS r2 
+FROM db1)
+
+SELECT ROUND((count(*) * sum(ROUND(r1, 2) * r2) - sum(ROUND(r1,2)) * sum(r2)) / 
+        (sqrt(count(*) * sum(ROUND(r1, 2) * ROUND(r1,2)) - sum(ROUND(r1,2)) * sum(ROUND(r1,2))) * sqrt(count(*) * sum(r2 * r2) - sum(r2) * sum(r2))), 4)
+AS correlation_coefficient        
+FROM db2;
+
+
+
+-- correlation between equity and fixed income
+WITH 
+db1 AS (SELECT major_asset_class, minor_asset_class, id, security_name, sec_type, date, value, pr.ticker, price_type, 
+LAG (value,360) OVER (
+PARTITION BY pr.ticker 
+ORDER BY date) AS lagged_price
+FROM pricing_daily_new AS pr
+INNER JOIN security_masterlist AS se
+ON se.ticker = pr.ticker
+WHERE price_type = 'Adjusted' and `date`),
+
+db2 AS (SELECT 
+CASE WHEN major_asset_class = "fixed income" OR  major_asset_class = "fixed income corporate" or major_asset_class = "fixed_income" THEN (value - lagged_price) / lagged_price
+ELSE 0
+END AS r1,
+CASE WHEN major_asset_class = "equity" OR  major_asset_class = "equty" THEN (value - lagged_price) / lagged_price
+ELSE 0
+END AS r2 
+FROM db1)
+
+SELECT ROUND((count(*) * sum(ROUND(r1, 2) * r2) - sum(ROUND(r1,2)) * sum(r2)) / 
+        (sqrt(count(*) * sum(ROUND(r1, 2) * ROUND(r1,2)) - sum(ROUND(r1,2)) * sum(ROUND(r1,2))) * sqrt(count(*) * sum(r2 * r2) - sum(r2) * sum(r2))), 4)
+AS correlation_coefficient        
+FROM db2;
+
+-- --------------------------------------------------------------------------------------
+-- |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+-- ------------------------------------------------------------------------------------
+
+
+
+-- ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+-- |||||||3. What is the most recent 12M sigma (risk) for each of the securities?||||||||
+-- ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+
+-- Calculating the annual risk and finding out the risky tickers present in our client based on this Decision are take to sell the tickers
+SELECT ticker,major_asset_class,
+AVG(returns) as mu,
+STD(returns) as sigma,
+AVG(returns)/(STD(returns)*sqrt(250)) as annual_risk_adj_returns
+FROM
+(SELECT R.`date`, R.ticker, R.`value`, R.lagged_price, R.price_type,R.major_asset_class,
+(R.value - R.lagged_price)/R.lagged_price as returns
+FROM ( Select cd.full_name,pd.ticker,sm.major_asset_class,pd.`value`,pd.`date`,pd.price_type, 
+LAG( pd.`value`, 250) OVER ( PARTITION BY pd.ticker ORDER BY pd.`date`) as lagged_price
+FROM account_dim AS ad
+JOIN customer_details AS cd
+ON  ad.client_id = cd.customer_id
+JOIN holdings_current AS hc
+ON ad.account_id = hc.account_id
+JOIN security_masterlist AS sm
+ON sm.ticker = hc.ticker
+JOIN pricing_daily_new AS pd
+ON sm.ticker = pd.ticker
+WHERE hc.account_id = '712' OR  hc.account_id = '71201' OR hc.account_id = '22501' OR hc.account_id = '22502' 
+OR hc.account_id = '160' OR hc.account_id = '16001'
+OR hc.account_id = '71401' OR hc.account_id = '71402'
+AND hc.price_type like '%Adjusted%' AND pd.date > '2019-09-09' ) as R) as profreturns
+GROUP BY ticker,major_asset_class
+order by annual_risk_adj_returns asc;
+
+
+
+-- ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+-- ||||4. Based on the previous 3 questions, which holdings would you sell, which holdings would you buy?|| 
+-- ||||Are there any outside securities that you would recommend adding to the portfolio?          ||||||||
+-- ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+
+-- Finding the tickers with maximum returns and based on this output recommendations are given to clients about what stocks to be purchased
+SELECT ticker,major_asset_class,
+AVG(returns) as mu,
+STD(returns) as sigma,
+AVG(returns)/(STD(returns)*sqrt(250)) as annual_risk_adj_returns
+FROM
+(SELECT R.date, R.ticker, R.value, R.lagged_price, R.price_type,R.major_asset_class,
+(R.value - R.lagged_price)/R.lagged_price as returns
+FROM ( Select pd.ticker,sm.major_asset_class,pd.`value`,pd.`date`,pd.price_type, LAG( value, 1) 
+OVER ( PARTITION BY ticker ORDER BY date) as lagged_price
+FROM pricing_daily_new as pd
+JOIN security_masterlist as sm
+on pd.ticker=sm.ticker
+WHERE pd.price_type='Adjusted' AND pd.date > '2019-09-09' ) as R) as profreturns
+GROUP BY ticker,major_asset_class
+order by annual_risk_adj_returns desc;
